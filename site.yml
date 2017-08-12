@@ -1,0 +1,3 @@
+---
+- hosts: webservers
+  - include: webservers.yml

@@ -1,0 +1,103 @@
+---
+# httpd
+- name: httpd is installed
+  sudo: yes
+  yum: pkg=httpd state=installed
+  tags: httpd
+
+- name: httpd is running and enabled
+  sudo: yes
+  service: name=httpd state=running enabled=yes
+  tags: httpd
+
+# mysql
+- name: mysql is installed
+  sudo: yes
+  yum: pkg={{ item }} state=installed
+  with_items:
+    - mysql-server
+    - mysql-devel
+  tags: mysqld
+
+- name: mysqld is running and enabled
+  sudo: yes
+  service: name=mysqld state=running enabled=yes
+  tags: mysqld
+
+# php
+- name: php is installed
+  sudo: yes
+  yum: pkg={{ item }} state=installed
+  with_items:
+    - php
+    - php-mbstring
+    - php-common
+    - php-pear
+    - php-cli
+    - php-mysql
+  notify:
+    - restart httpd
+  tags: php
+
+- name: php is configured
+  sudo: yes
+  notify:
+    - restart httpd
+  lineinfile: dest="/etc/php.ini" state=present regexp="^\;date.timezone =$" line="date.timezone = Asia/Tokyo" backrefs=yes
+  tags: php
+
+# git
+- name: git is installed
+  sudo: yes
+  yum: pkg=git state=installed
+  tags: git
+
+# ruby
+- name: rbenv is installed
+  sudo: yes
+  git: repo=https://github.com/sstephenson/rbenv.git dest={{ rbenv_dir }} version=master accept_hostkey=yes
+  tags: ruby
+
+- name: setup rbenv
+  sudo: yes
+  copy: src=rbenv.sh dest=/etc/profile.d
+  tags: ruby
+
+- name: install ruby-build
+  sudo: yes
+  git: repo=https://github.com/sstephenson/ruby-build.git dest={{ rbenv_dir }}/plugins/ruby-build accept_hostkey=yes
+  tags: ruby
+
+- name: install ruby dependncies
+  sudo: yes
+  yum: name={{ item }} state=latest
+  with_items:
+    - gcc
+    - gcc-c++
+    - glibc-headers
+    - openssl-devel
+    - readline-devel
+    - libyaml-devel
+    - zlib-devel
+    - libffi-devel
+    - libxml2-devel
+    - libxslt-devel
+  tags: ruby
+
+- name: check ruby installed
+  sudo: yes
+  shell: /bin/bash -lc "rbenv versions | grep {{ ruby_version }}"
+  register: ruby_installed
+  ignore_errors: yes
+  tags: ruby
+
+- name: install ruby
+  sudo: yes
+  shell: /bin/bash -lc "rbenv install {{ ruby_version }} && rbenv rehash && rbenv global {{ ruby_version }}"
+  tags: ruby
+  when: ruby_installed|failed
+
+- name: install bundler
+  sudo: yes
+  shell: /bin/bash -lc "gem install bundler"
+  tags: ruby
